@@ -1,0 +1,51 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="godot-template"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://assets/icon.svg"
+
+[display]
+
+window/size/viewport_width=640
+window/size/viewport_height=360
+window/stretch/mode="viewport"
+window/stretch/aspect="expand"
+window/stretch/scale_mode="integer"
+
+[global_group]
+
+player=""
+enemies=""
+
+[layer_names]
+
+2d_physics/layer_1="player"
+2d_physics/layer_2="enemies"
+2d_physics/layer_3="player_bullets"
+2d_physics/layer_4="enemy_bullets"
+2d_physics/layer_5="pickups"
+2d_physics/layer_6="world"
+
+[physics]
+
+3d/physics_engine="Jolt Physics"
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
+rendering_device/driver.windows="d3d12"
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+2d/snap/snap_2d_transforms_to_pixel=true
+2d/snap/snap_2d_vertices_to_pixel=true
