@@ -1,3 +1,6 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+
+# Per-project status file, not tracked (see RULEBOOK.md)
+TASKS.md
