@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="ItemData" format=3 uid="uid://spb22ovg88rb"]
+
+[ext_resource type="Script" uid="uid://cjfs6qyithd7j" path="res://scripts/data/item_data.gd" id="1_7prid"]
+
+[resource]
+script = ExtResource("1_7prid")
+id = "example_item"
+display_name = "Example Item"
+description = "Replace this row with real content"
+power = 1.5
