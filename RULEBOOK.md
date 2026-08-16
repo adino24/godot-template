@@ -10,8 +10,8 @@ rule doesn't fit your game, the why is what tells you whether breaking it
 is fine or whether you're about to have a bad month.
 
 Per-game decisions do **not** go in this file. Each game keeps its own
-`GDD.md` (design), `DECISIONS.md` or `RULEBOOK.md` (that game's technical
-choices), and `TASKS.md` (status).
+`wiki/` — design, technical decisions, and system knowledge, maintained
+as the game is built (section 7) — plus a root `TASKS.md` (status).
 
 ---
 
@@ -383,7 +383,81 @@ should be data entry, not new code.
 
 ---
 
-## 7. Starting a new game from this template
+## 7. The game wiki
+
+Every game keeps a `wiki/` — a small markdown knowledge base maintained
+*as the game is built*, never written up afterwards. The code says
+**how**; the wiki says **what exists and why**. Without it, every
+return to the project starts by re-reading the codebase to reconstruct
+intent, and that reconstruction is thrown away when the session ends.
+The wiki is where it compounds instead.
+
+The model is Karpathy's "LLM wiki" pattern, adapted: **sources** you
+never edit (the code, scenes, and data — the truth), **synthesis** you
+always maintain (the wiki), and a **schema** that keeps the maintainer
+disciplined (this section). The wiki describes the sources; it never
+contradicts them and never substitutes for them.
+
+This replaces the separate `GDD.md` / `DECISIONS.md` files: design and
+decisions are wiki pages. `TASKS.md` stays at the project root — it's
+status and future work, not knowledge.
+
+### Layout
+```
+wiki/
+  index.md      every page, one line each, grouped by category
+  log.md        append-only history: what changed and when
+  design.md     what this game is — pitch, pillars, core loop, scope
+  decisions.md  this game's technical choices and their why
+  systems/      one page per game system: combat.md, waves.md, economy.md
+```
+
+**One page per system, not per file.** `scripts/` already mirrors
+`scenes/`; the wiki mirrors the game's *mental model* — the layer the
+folder structure can't show. A `combat.md` explains how damage,
+i-frames, and knockback interact even though they live in five scripts.
+
+### The three operations
+
+- **Ingest — update in the same session the change lands.** A feature
+  is finished when its wiki pages are revised, its `index.md` line is
+  current, and a `log.md` entry is appended — not before. A wiki
+  updated "later" is a wiki that lies, and a lying wiki is worse than
+  none because it's believed. Same principle as "keep comments true."
+- **Query — read `index.md` first, always.** Any work session, any new
+  feature: open the index, then only the pages it points to. This is
+  the whole payoff — resuming after eight months (or onboarding an
+  agent cold) costs three pages, not the codebase.
+- **Lint — sweep for rot occasionally.** Pages that contradict each
+  other, claims the code has outgrown, pages nothing links to, file
+  pointers that got renamed out from under you. Do a pass when the wiki
+  starts feeling unreliable — roughly monthly during active work.
+
+### What a page contains
+
+- What the system does, how its parts connect, and which decisions
+  shaped it — with the *why*, since that's the part the code can't say.
+- **Pointers to files, never pasted code.**
+  `scripts/components/health_component.gd` stays true when its contents
+  change; a quoted snippet silently rots.
+- **Cross-links to related pages.** A page nothing links to is a page
+  nobody finds — the lint pass hunts these.
+
+### log.md entries
+
+Append-only, one entry per ingest, a consistent grep-able prefix:
+```
+## [2026-08-16] feature | Dash with i-frames
+- Added DashComponent (scripts/components/dash_component.gd)
+- Updated: systems/combat.md, systems/movement.md, index.md
+- Decision: i-frames exist only during dash — see decisions.md
+```
+`index.md` tells you where things are; `log.md` tells you what happened
+recently — the first thing to read when coming back after a gap.
+
+---
+
+## 8. Starting a new game from this template
 
 1. Copy the template folder; rename it.
 2. `project.godot` → `config/name`, and set your base resolution.
@@ -391,7 +465,8 @@ should be data entry, not new code.
 4. Adjust the Input Map to your control scheme.
 5. Delete the example component/data pipeline if the game doesn't need
    them; keep the folder skeleton.
-6. Create the game's own `GDD.md` (design), `TASKS.md` (status), and a
-   decisions log for that game's technical choices.
+6. Seed the `wiki/` (section 7): write `design.md` — pitch, pillars,
+   core loop — *before* writing code, and put the first entry in
+   `log.md`. Create a root `TASKS.md` (status).
 7. Leave this file alone. Rules that turn out to be wrong get fixed
    **here**, in the template, so the next game inherits the fix.
