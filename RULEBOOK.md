@@ -44,6 +44,28 @@ some pixels being drawn 2px wide and their neighbours 3px.
 Base resolution is one of the few genuinely per-game values. 640x360 is
 16:9 and integer-scales cleanly to 720p and 1080p.
 
+**Pick it on day one.** Changing it later is not a config edit. Every
+absolute coordinate, every `font_size`, and any per-project pixel scale
+moves with it — and all of them have to move in the *same commit*,
+because the game is broken in between. Flipping the base resolution on
+its own breaks every screen laid out in the old one, and setting
+`scale_mode="integer"` on its own, over a base resolution that is already
+large, clamps a big display to 1x inside black borders — worse than not
+setting it at all.
+
+### Texture import defaults
+Pin the pixel-art import settings **project-wide** — nearest filter, no
+mipmaps, no compression — as a project import default or preset, never
+file by file.
+
+The rendering setting above governs how a texture is *drawn*. Mipmaps and
+compression soften it at *import*, before drawing is involved at all, so
+the two are set separately — art still comes out soft with the filter
+correct and compression left on. Doing it per-file means hand-editing
+`.import` sidecars, which are committed (see version control below), so
+every re-import on someone else's machine becomes a diff. Set the default
+once and nobody ever opens a sidecar.
+
 ### Named collision layers
 Name every physics layer you use, in Project Settings → Layer Names,
 *before* you build anything that collides.
@@ -91,13 +113,14 @@ Godot's project-creation dialog generates `.gitignore` / `.gitattributes`
 ## 2. Folder structure
 
 ```
-assets/              art + audio source (subfolder per kind: fonts/, icons/)
+assets/              art + audio source (subfolder per kind: fonts/, music/)
+assets/art/          images, one subfolder per kind: ships/, icons/, ui/
 data/                content instances: .csv sources + generated .tres
 scenes/              one .tscn per game object or screen
 scripts/             one .gd per scene, same basename
 scripts/components/  reusable components
 scripts/data/        Resource subclasses (the shape of your data)
-tools/               EditorScripts (generators) — never runs at game runtime
+tools/               EditorScripts: generators + checkers, never at runtime
 ```
 
 **`scripts/` mirrors `scenes/` by name.** `scenes/player.tscn` pairs with
@@ -112,6 +135,33 @@ to or loaded by other things.
 class, one file forever. `data/items/big_sword.tres` is *one actual
 item* — content, and there will eventually be sixty. Shape lives with
 the code; instances live in `data/`.
+
+### Art is files, not code
+
+**Never generate shipping art in code.** No sprite built at runtime out
+of string maps, no game object drawn with `draw_rect` because that was
+quicker than making a file. As prototype scaffolding it's fine, and often
+faster. As the art path you actually ship, it means an artist cannot
+contribute one pixel without editing GDScript — which in practice means
+they don't contribute at all, and you stay the bottleneck on every visual
+in the game.
+
+**The filename is the link — no registry.** Art lives at
+`assets/art/<kind>/<id>.png`, where the filename *is* the value already
+sitting in the data's `sprite` / `icon` column. Dropping a file in the
+folder puts it in the game: no code change, no data edit, nothing to
+register anywhere. It's section 5's rule pointed at images — content is
+data, and a file on disk is data.
+
+Where one shared column value has to cover entries that must look
+*different*, key the file by the entry's own unique id and keep the
+shared column as a fallback for art that genuinely is shared.
+
+**`modulate` is for transient effects, not content variants.** Flashing a
+sprite white on hit is exactly what tinting is for. Recolouring one shape
+into three "different" things works right until the art is painted rather
+than generated — at which point all three need their own file anyway, so
+the trick bought nothing and cost you a migration.
 
 ---
 
@@ -206,6 +256,29 @@ first — and it presents as a bug nowhere near the autoload.
 
 Pausing the tree freezes enemies, timers and physics for free — much
 better than stopping each system by hand.
+
+### UI is scenes, not code
+"Screens are dumb" is the split. This is how the screens get built.
+
+- **Editor-placed nodes in a `.tscn`** — `Button`, `Label`,
+  `TextureRect`, `TextureProgressBar` — not a tree assembled with
+  `.new()` and then painted in `_draw()`. Populate it through an explicit
+  `refresh()`-style call at state-transition points.
+- **No per-frame `queue_redraw()` on UI that isn't animated.** A
+  `_process()` whose whole body is a redraw is polling for a change some
+  signal already knows about.
+- **Template + instance when the count varies at runtime.** Give the
+  repeated thing its own `.tscn` and `preload().instantiate()` one per
+  item. Hand-building N copies in a loop is the same mistake as a script
+  per item in section 5.
+- **`_draw()` + `_process()` are correct for genuinely continuous
+  visuals** — anything driven by gameplay time that really does change
+  every frame. Leave those alone; converting them for the sake of
+  consistency is how this rule gets misapplied. The target is static UI
+  impersonating an animation.
+- **Anchors and containers, not absolute coordinates.** Hardcoded pixel
+  positions are precisely what turns a base-resolution change (section 1)
+  from a settings edit into a whole-project refactor.
 
 ### Injected targets, not hardcoded ones
 A component that needs something to act on takes it as a variable:
@@ -341,6 +414,13 @@ data/things.csv          hand-edited source of truth
 - **Autoload database** — gameplay fetches by id and never knows where
   anything is stored on disk.
 
+**One sheet per kind.** The moment a single CSV serves several kinds of
+thing and half its columns are blank on any given row, split it — one
+sheet per kind, each carrying only the columns that kind actually uses.
+Same generator, same database API, and every sheet becomes narrow enough
+to read without scrolling sideways, which is the whole reason it's a
+spreadsheet.
+
 **Define the shape as a `Resource` subclass** in `scripts/data/`, with
 `@export` fields — not a Dictionary and not JSON. You get static typing,
 Inspector editing, and `preload`-ability.
@@ -350,9 +430,43 @@ Inspector editing, and `preload`-ability.
 level, equipped) lives in a separate structure that resets each run. Put
 run state on a shared resource and it will leak between runs.
 
-**Use an enum + shared handler for behaviour variants** (`STAT_ONLY`,
-`MULTI_HIT`, ...) rather than a script per item. Scaling from 3 to 60
-should be data entry, not new code.
+**Behaviour is data, resolved by a registry.** The rule underneath it:
+*no content id ever appears in simulation code.* A bare `special` string
+the sim tests for (`if thing.special == "shield"`) means every new
+behaviour is an edit in every file that tests it, and those files are
+never all in one place. Give the row an effects column instead —
+pipe-separated `verb:args` (`shield:5`, `push:8`, `pierce`) — resolved
+through one registry script where each verb is defined exactly once.
+Several verbs per row, so variety comes from combinations instead of from
+new code. Scaling from 3 to 60 should be data entry.
+
+**Fail loudly at generation.** An unknown verb, an unknown column, or an
+out-of-range value aborts the generator and names the row number. The
+alternative is a silently inert entry that ships and gets found by a
+playtester three weeks later, when nobody remembers touching it.
+
+**Hot reload in dev mode.** A dev-only key that re-reads the sources and
+rebuilds the database in the running game. It turns the tuning loop from
+edit → regenerate → relaunch → replay back to where you were, into
+edit → keypress. It costs an afternoon, and on a data-driven project it
+is the largest workflow win available.
+
+**`tools/` holds checkers, not just generators.** Make them
+headless-runnable:
+- a **balance report** — the whole pool as one table (cost, output, tier,
+  weight) with rule breaks flagged: tier 1 out-performing tier 3, values
+  out of band for their tier, weight 0, duplicate ids, verbs nothing
+  uses.
+- an **asset checker** — every `sprite`/`icon` value has a matching file;
+  orphan files nothing references; files at the wrong canvas size.
+
+Generation catches content that is *malformed*. These catch content that
+is *wrong*, and wrong is the kind that ships.
+
+**Prose is CSV's weak spot** — description and flavour text are quoted
+strings full of commas. If it starts costing you, move the text to a
+strings file keyed by id. Never move the *numbers* out: side-by-side
+comparison is the reason the table exists at all.
 
 ---
 
@@ -380,6 +494,15 @@ should be data entry, not new code.
   or a permanent `valid=false` in the `.import`. Select the file →
   Import dock → Import As → **Keep File (No Import)** → Reimport. Only
   the generator reads the CSV anyway; Godot should leave it alone.
+- **A migration fallback needs its deletion criterion written down the
+  day you add it.** Falling through to the old path for anything not yet
+  converted is the right way to migrate — no long-lived branch, nothing
+  ever broken, one entry converted at a time. But it is scaffolding, not
+  a second permanent path. Left in, you keep a whole system nobody
+  maintains, plus a silent failure mode: a typo'd filename quietly serves
+  the old thing and looks like it worked. Say up front what "done" means,
+  delete the old path when you reach it, and log when the fallback fires
+  in dev so a typo is visible instead of invisible.
 
 ---
 
@@ -442,6 +565,11 @@ i-frames, and knockback interact even though they live in five scripts.
   change; a quoted snippet silently rots.
 - **Cross-links to related pages.** A page nothing links to is a page
   nobody finds — the lint pass hunts these.
+- **When a page restates a document that lives outside the wiki** — an
+  art spec, an audio list, a brief someone else works from — say which of
+  the two wins. The wiki is synthesis, and synthesis that silently
+  disagrees with its source is worse than no page. Same principle as
+  "keep comments true."
 
 ### log.md entries
 
@@ -461,12 +589,17 @@ recently — the first thing to read when coming back after a gap.
 
 1. Copy the template folder; rename it.
 2. `project.godot` → `config/name`, and set your base resolution.
-3. Adjust `[layer_names]` to the collisions your game actually has.
-4. Adjust the Input Map to your control scheme.
-5. Delete the example component/data pipeline if the game doesn't need
+   Settle it now — section 1 says why moving it later is expensive.
+3. Pin the project-wide texture import default (nearest, no mipmaps,
+   no compression) before any art lands.
+4. Adjust `[layer_names]` to the collisions your game actually has.
+5. Adjust the Input Map to your control scheme.
+6. Create the `assets/art/<kind>/` folders this game needs, so the
+   first sprite has somewhere to go that isn't a script.
+7. Delete the example component/data pipeline if the game doesn't need
    them; keep the folder skeleton.
-6. Seed the `wiki/` (section 7): write `design.md` — pitch, pillars,
+8. Seed the `wiki/` (section 7): write `design.md` — pitch, pillars,
    core loop — *before* writing code, and put the first entry in
    `log.md`. Create a root `TASKS.md` (status).
-7. Leave this file alone. Rules that turn out to be wrong get fixed
+9. Leave this file alone. Rules that turn out to be wrong get fixed
    **here**, in the template, so the next game inherits the fix.
