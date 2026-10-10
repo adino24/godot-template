@@ -1,6 +1,11 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+*.tmp
+
+# Exported builds — made from export_presets.cfg, never committed.
+export_presets.cfg
+build/
 
 # Per-project status file, not tracked (see RULEBOOK.md)
 TASKS.md

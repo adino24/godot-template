@@ -4,6 +4,9 @@ How we build games in Godot. This is the methodology, not a design doc —
 it should be true of every game made from this template, regardless of
 genre.
 
+**Engine:** Godot 4.x. **Language:** GDScript — every convention and
+example below assumes it; there's no C# workflow in this template.
+
 **Using this template:** clone it, rename the project, then work through
 "Starting a new game" at the bottom. Every rule here has a *why*; when a
 rule doesn't fit your game, the why is what tells you whether breaking it
@@ -316,8 +319,8 @@ Taken from working code — match it.
   `func _ready() -> void:`, `@onready var body: Node2D = get_parent()`.
   Typed `@onready` references are what give you autocomplete on your own
   components.
-- `snake_case` functions/variables/filenames, `PascalCase` classes and
-  node names, `SCREAMING_SNAKE_CASE` constants.
+- `snake_case` functions/variables/filenames/signals, `PascalCase` classes
+  and node names, `SCREAMING_SNAKE_CASE` constants.
 - **`class_name` on components and data classes; not on scene scripts.**
   Components and `Resource` subclasses are types you reference by name.
   A `player.gd` that drives exactly one scene isn't.
@@ -494,6 +497,16 @@ comparison is the reason the table exists at all.
   or a permanent `valid=false` in the `.import`. Select the file →
   Import dock → Import As → **Keep File (No Import)** → Reimport. Only
   the generator reads the CSV anyway; Godot should leave it alone.
+- **A `SubViewport` does NOT inherit
+  `rendering/textures/canvas_textures/default_texture_filter`.**
+  `Viewport.canvas_item_default_texture_filter` is its own property and
+  defaults to **Linear**, so everything inside a new SubViewport is
+  bilinear-filtered while the project setting says nearest. Set
+  `canvas_item_default_texture_filter = 0` on every SubViewport explicitly.
+  It hides well: a sprite's outer edge against the background still steps
+  hard, so an edge-only check says "crisp". The tell is interior colour
+  boundaries, or counting distinct colours across a ship — 11 when filtered,
+  4 when not. Cost an afternoon on 2026-08-31.
 - **A migration fallback needs its deletion criterion written down the
   day you add it.** Falling through to the old path for anything not yet
   converted is the right way to migrate — no long-lived branch, nothing

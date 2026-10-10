@@ -1,2 +1,4 @@
 # Normalize EOL for all files that Git considers text files.
+# Godot writes LF; without this, core.autocrlf=true reports every .import
+# file as modified forever while `git diff` shows nothing changed.
 * text=auto eol=lf
